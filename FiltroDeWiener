@@ -1,0 +1,44 @@
+import numpy as np
+import cv2
+import matplotlib.pyplot as plt
+
+# Carregar a imagem 
+image = cv2.imread('dog.png', cv2.IMREAD_GRAYSCALE)
+
+# Verificar se a imagem foi carregada corretamente
+if image is None:
+    raise Exception("A imagem não foi carregada corretamente. Verifique o caminho do arquivo.")
+
+# Suavizar a imagem original para reduzir o ruído
+smoothed_image = cv2.GaussianBlur(image, (5, 5), 0)
+
+# Aplicar ruído à imagem suavizada com desvio padrão menor
+noise = np.random.normal(0, 5, image.shape).astype(np.uint8)
+noisy_image = cv2.add(smoothed_image, noise)
+
+# Ajustar o parâmetro sigma
+sigma = 50
+
+# Pré-processamento da imagem com suavização bilateral
+preprocessed_image = cv2.bilateralFilter(noisy_image, d=9, sigmaColor=50, sigmaSpace=50)
+
+# Calcular o espectro de potência do ruído e da imagem com ruído
+noise_spectrum = np.abs(np.fft.fft2(noise)) ** 2
+image_spectrum = np.abs(np.fft.fft2(preprocessed_image)) ** 2
+
+# Calcular o filtro de Wiener no domínio da frequência
+wiener_filter = 1 / (1 + (sigma ** 2 / noise_spectrum))
+
+# Aplicar o filtro de Wiener no domínio da frequência
+restored_image_complex = np.fft.ifft2(np.fft.fft2(preprocessed_image) * wiener_filter)
+restored_image = np.uint8(np.clip(np.abs(restored_image_complex), 0, 255))
+
+# Aplicar um filtro de suavização gaussiana mais forte para reduzir o pixelado
+final_image = cv2.GaussianBlur(restored_image, (9, 9), 0)
+
+# Exibir as imagens
+plt.figure(figsize=(12, 5))
+plt.subplot(131), plt.imshow(image, cmap='gray'), plt.title('Imagem Original')
+plt.subplot(132), plt.imshow(noisy_image, cmap='gray'), plt.title('Imagem com Ruído')
+plt.subplot(133), plt.imshow(final_image, cmap='gray'), plt.title('Imagem Restaurada com Filtro de Wiener')
+plt.show()
